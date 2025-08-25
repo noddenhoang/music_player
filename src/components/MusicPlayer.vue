@@ -6,6 +6,18 @@
       <div class="gradient-orb orb-1" />
       <div class="gradient-orb orb-2" />
       <div class="gradient-orb orb-3" />
+      <div class="gradient-orb orb-4" />
+      <div class="gradient-orb orb-5" />
+      
+      <!-- Explosion rings based on music -->
+      <div class="explosion-container">
+        <div 
+          v-for="explosion in explosionRings" 
+          :key="explosion.id"
+          class="explosion-ring"
+          :style="explosion.style"
+        />
+      </div>
     </div>
 
     <!-- Floating Playlist Toggle Button - Ẩn khi playlist đang show -->
@@ -62,7 +74,6 @@
           <!-- Track Info -->
           <div v-if="currentTrack" class="track-info">
             <h2 class="track-name">{{ currentTrack.name }}</h2>
-            <p class="track-details">{{ formatFileType(currentTrack.type) }} • {{ formatFileSize(currentTrack.size) }}</p>
           </div>
           
           <div v-else class="track-info">
@@ -189,6 +200,16 @@
       @error="handleAudioError"
     />
 
+    <!-- Notification Dialog -->
+    <NotificationDialog
+      :visible="notification.visible"
+      :title="notification.title"
+      :message="notification.message"
+      :type="notification.type"
+      :auto-close="notification.autoClose"
+      @close="closeNotification"
+    />
+
     <!-- Loading Overlay -->
     <div
       v-if="isLoading"
@@ -212,6 +233,7 @@ import Visualizer from './VisualizerSimple.vue'
 import Controls from './Controls.vue'
 import Volume from './Volume.vue'
 import Playlist from './Playlist.vue'
+import NotificationDialog from './NotificationDialog.vue'
 
 // Audio player composable
 const {
@@ -251,6 +273,16 @@ const {
 const showPlaylist = ref(false)
 const cdScale = ref(1)  // Scale theo sound wave realtime
 const nowPlayingBeat = ref(false)
+const explosionRings = ref([])  // Vòng tròn nổ theo nhạc
+
+// Notification state
+const notification = ref({
+  visible: false,
+  title: '',
+  message: '',
+  type: 'info',
+  autoClose: 3000
+})
 
 // Refs
 const audioElementRef = ref(null)
@@ -285,6 +317,21 @@ const formatFileType = (type) => {
   return audioType || 'Audio'
 }
 
+// Notification functions
+const showNotification = (title, message, type = 'info', autoClose = 3000) => {
+  notification.value = {
+    visible: true,
+    title,
+    message,
+    type,
+    autoClose
+  }
+}
+
+const closeNotification = () => {
+  notification.value.visible = false
+}
+
 // Handle progress bar click
 const handleProgressClick = (event) => {
   const rect = event.currentTarget.getBoundingClientRect()
@@ -305,7 +352,11 @@ const handleFileInput = (event) => {
   const files = event.target.files
   if (files.length > 0) {
     const count = addFiles(files)
-    console.log(`Added ${count} audio files to playlist`)
+    showNotification(
+      '🎵 Files Added',
+      `Successfully added ${count} audio file${count > 1 ? 's' : ''} to playlist`,
+      'success'
+    )
   }
   
   // Reset input
@@ -316,7 +367,11 @@ const handleFolderInput = (event) => {
   const files = event.target.files
   if (files.length > 0) {
     const count = addFiles(files)
-    console.log(`Added ${count} audio files from folder to playlist`)
+    showNotification(
+      '📁 Folder Added',
+      `Successfully added ${count} audio file${count > 1 ? 's' : ''} from folder to playlist`,
+      'success'
+    )
   }
   
   // Reset input
@@ -361,17 +416,68 @@ onMounted(async () => {
       // Now playing beat khi có âm thanh mạnh
       nowPlayingBeat.value = avgIntensity > 0.2
       
+      // Tạo explosion rings theo nhạc
+      createExplosionRings(avgIntensity)
+      
       requestAnimationFrame(detectBeat)
     } else {
       // Reset khi không phát nhạc
       cdScale.value = 1
       nowPlayingBeat.value = false
+      explosionRings.value = []
       if (isPlaying.value) {
         setTimeout(detectBeat, 100)
       }
     }
   }
   
+  // Tạo explosion rings theo nhạc
+  const createExplosionRings = (intensity) => {
+    // Chỉ tạo khi nhạc đủ mạnh
+    if (intensity < 0.4) return
+    
+    const ringCount = Math.floor(intensity * 2) // 1-2 rings cho ít lộn xộn hơn
+    
+    for (let i = 0; i < ringCount; i++) {
+      if (explosionRings.value.length > 15) {
+        explosionRings.value.shift() // Xóa ring cũ nhất
+      }
+      
+      // Màu khói nhạt và mờ hơn
+      const colors = [
+        'rgba(173, 216, 230, 0.08)', // Light blue smoke
+        'rgba(221, 160, 221, 0.06)', // Light plum smoke  
+        'rgba(152, 251, 152, 0.05)', // Light green smoke
+        'rgba(255, 218, 185, 0.07)', // Light peach smoke
+        'rgba(230, 230, 250, 0.04)', // Lavender smoke
+        'rgba(240, 248, 255, 0.06)', // Alice blue smoke
+        'rgba(250, 240, 230, 0.07)', // Linen smoke
+        'rgba(245, 245, 220, 0.05)'  // Beige smoke
+      ]
+      
+      const ring = {
+        id: Date.now() + Math.random(),
+        style: {
+          left: Math.random() * 80 + 10 + '%',  // 10-90% để không ra ngoài
+          top: Math.random() * 80 + 10 + '%',
+          '--ring-color': colors[Math.floor(Math.random() * colors.length)],
+          '--ring-size': (120 + intensity * 150) + 'px', // Size dựa theo intensity nhưng lớn hơn
+          '--animation-duration': (2.5 + Math.random() * 1.5) + 's' // Chậm hơn cho hiệu ứng khói
+        }
+      }
+      
+      explosionRings.value.push(ring)
+      
+      // Tự động xóa ring sau 4s
+      setTimeout(() => {
+        const index = explosionRings.value.findIndex(r => r.id === ring.id)
+        if (index > -1) {
+          explosionRings.value.splice(index, 1)
+        }
+      }, 4000)
+    }
+  }
+
   // Start beat detection when playing
   watch(isPlaying, (playing) => {
     if (playing) {
@@ -449,7 +555,7 @@ onMounted(async () => {
   position: absolute;
   border-radius: 50%;
   filter: blur(48px);
-  animation: pulse 3s ease-in-out infinite;
+  animation: floatAndPulse 8s ease-in-out infinite;
 }
 
 .orb-1 {
@@ -457,7 +563,8 @@ onMounted(async () => {
   left: 80px;
   width: 288px;
   height: 288px;
-  background: rgba(139, 92, 246, 0.2);
+  background: linear-gradient(45deg, rgba(139, 92, 246, 0.3), rgba(236, 72, 153, 0.2));
+  animation-delay: 0s;
 }
 
 .orb-2 {
@@ -465,8 +572,8 @@ onMounted(async () => {
   right: 80px;
   width: 384px;
   height: 384px;
-  background: rgba(59, 130, 246, 0.2);
-  animation-delay: 1s;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(34, 197, 94, 0.2));
+  animation-delay: 2s;
 }
 
 .orb-3 {
@@ -475,8 +582,45 @@ onMounted(async () => {
   transform: translate(-50%, -50%);
   width: 256px;
   height: 256px;
-  background: rgba(236, 72, 153, 0.2);
-  animation-delay: 2s;
+  background: linear-gradient(225deg, rgba(236, 72, 153, 0.3), rgba(251, 191, 36, 0.2));
+  animation-delay: 4s;
+}
+
+.orb-4 {
+  top: 20%;
+  right: 15%;
+  width: 192px;
+  height: 192px;
+  background: linear-gradient(315deg, rgba(34, 197, 94, 0.25), rgba(139, 92, 246, 0.15));
+  animation-delay: 1s;
+}
+
+.orb-5 {
+  bottom: 30%;
+  left: 10%;
+  width: 320px;
+  height: 320px;
+  background: linear-gradient(45deg, rgba(251, 191, 36, 0.2), rgba(59, 130, 246, 0.2));
+  animation-delay: 3s;
+}
+
+/* Floating particles */
+.explosion-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.explosion-ring {
+  position: absolute;
+  width: var(--ring-size, 100px);
+  height: var(--ring-size, 100px);
+  background: radial-gradient(circle, var(--ring-color, rgba(139, 92, 246, 0.15)) 0%, transparent 70%);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  animation: smokeExpand var(--animation-duration, 1s) ease-out forwards;
+  filter: blur(8px);
+  opacity: 0.3;
 }
 
 .main-section {
@@ -596,6 +740,7 @@ onMounted(async () => {
 .cd-container {
   position: relative;
   margin: 0 auto;
+  padding: 20px;  /* Thêm padding để beat-ring không bị cắt */
   transition: transform 0.1s ease-out;  /* Smooth transition cho realtime scale */
 }
 
@@ -613,6 +758,20 @@ onMounted(async () => {
     0 0 20px rgba(139, 92, 246, 0.6),
     inset 0 0 20px rgba(139, 92, 246, 0.3);
   z-index: 1;
+}
+
+@media (max-width: 768px) {
+  .beat-ring {
+    width: 180px;
+    height: 180px;
+  }
+}
+
+@media (max-width: 480px) {
+  .beat-ring {
+    width: 160px;
+    height: 160px;
+  }
 }
 
 .cd-disc {
@@ -969,6 +1128,44 @@ onMounted(async () => {
   50% {
     opacity: 0.8;
     transform: scale(1.05);
+  }
+}
+
+/* New animations for dynamic background */
+@keyframes floatAndPulse {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.8;
+  }
+  25% {
+    transform: translate(20px, -15px) scale(1.1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-10px, -25px) scale(0.9);
+    opacity: 0.6;
+  }
+  75% {
+    transform: translate(-25px, 10px) scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+@keyframes smokeExpand {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0.6;
+    filter: blur(4px);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0.3;
+    filter: blur(6px);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(8);
+    opacity: 0;
+    filter: blur(12px);
   }
 }
 </style>

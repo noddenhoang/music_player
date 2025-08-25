@@ -37,12 +37,16 @@ const animationId = ref(null)
 const hasAudioData = ref(false)
 const frameCount = ref(0)
 
-// Color scheme for sound waves
-const colors = {
-  primary: 'rgba(147, 51, 234, 0.9)',    // Purple
-  secondary: 'rgba(59, 130, 246, 0.9)',  // Blue  
-  accent: 'rgba(34, 197, 94, 0.9)',      // Green
-  highlight: 'rgba(251, 191, 36, 0.9)'   // Yellow
+// Rainbow colors function
+const getRainbowColor = (index, total, time) => {
+  const hue = (index / total * 360 + time * 0.5) % 360
+  return `hsl(${hue}, 70%, 60%)`
+}
+
+// Get rainbow color with opacity
+const getRainbowColorWithOpacity = (index, total, time, opacity = 0.9) => {
+  const hue = (index / total * 360 + time * 0.5) % 360
+  return `hsla(${hue}, 70%, 60%, ${opacity})`
 }
 
 const initCanvas = async () => {
@@ -112,6 +116,9 @@ const drawFrequencyBars = (width, height) => {
   const barWidth = width / barCount * 0.8
   const barSpacing = width / barCount * 0.2
   
+  // Update frame count for rainbow animation
+  frameCount.value += 1
+  
   for (let i = 0; i < barCount; i++) {
     const dataIndex = Math.floor((i / barCount) * props.dataArray.length)
     const barHeight = Math.max(2, (props.dataArray[dataIndex] / 255) * height * 0.8)
@@ -119,27 +126,20 @@ const drawFrequencyBars = (width, height) => {
     const x = i * (barWidth + barSpacing)
     const y = height - barHeight
     
-    // Color based on frequency range
-    let color
-    if (i < barCount * 0.25) {
-      color = colors.primary
-    } else if (i < barCount * 0.5) {
-      color = colors.secondary
-    } else if (i < barCount * 0.75) {
-      color = colors.accent
-    } else {
-      color = colors.highlight
-    }
+    // Rainbow color based on position and time
+    const color = getRainbowColor(i, barCount, frameCount.value)
+    const colorWithOpacity = getRainbowColorWithOpacity(i, barCount, frameCount.value, 0.9)
+    const colorFaint = getRainbowColorWithOpacity(i, barCount, frameCount.value, 0.3)
     
     // Create gradient for each bar
     const gradient = ctx.value.createLinearGradient(x, y + barHeight, x, y)
-    gradient.addColorStop(0, color.replace('0.9', '0.3'))
-    gradient.addColorStop(1, color)
+    gradient.addColorStop(0, colorFaint)
+    gradient.addColorStop(1, colorWithOpacity)
     
     ctx.value.fillStyle = gradient
     ctx.value.fillRect(x, y, barWidth, barHeight)
     
-    // Add glow effect
+    // Add glow effect with rainbow color
     ctx.value.shadowColor = color
     ctx.value.shadowBlur = 10
     ctx.value.fillRect(x, y, barWidth, barHeight)
@@ -218,7 +218,7 @@ onUnmounted(() => {
   width: 100%;
   height: 200px;
   background: transparent;
-  border-radius: 24px;
+  border-radius: 0;  /* Bỏ bo cong */
   overflow: hidden;
 }
 
